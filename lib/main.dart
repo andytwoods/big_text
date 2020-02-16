@@ -46,26 +46,25 @@ class MyHomePage extends StatefulWidget {
 
 const textFieldPadding = EdgeInsets.all(8.0);
 const textFieldTextStyle = TextStyle(fontSize: 30.0);
+const String hintText = 'Start typing. Try zooming...';
+const double MaxFontSize = 200;
+const double MinFontSize = 10;
 
 class _MyHomePageState extends State<MyHomePage> {
   double _scale = 1.0;
 
   final TextEditingController _controller = TextEditingController();
   final GlobalKey _textFieldKey = GlobalKey();
-  final double MaxFontSize = 200;
-  final double MinFontSize = 2;
 
-  double _fontSize = textFieldTextStyle.fontSize;
+  double _fontSize = -1;
 
   @override
   Widget build(BuildContext context) {
-
-
     double getFontSize() {
       double _updatedFontSize = _fontSize * _scale;
-      if(_updatedFontSize < MinFontSize) return MinFontSize;
-      if(_updatedFontSize > MaxFontSize) return MaxFontSize;
-      return  _updatedFontSize;
+      if (_updatedFontSize < MinFontSize) return MinFontSize;
+      if (_updatedFontSize > MaxFontSize) return MaxFontSize;
+      return _updatedFontSize;
     }
 
     return Scaffold(
@@ -80,7 +79,7 @@ class _MyHomePageState extends State<MyHomePage> {
             _scale = scaleDetails.scale;
           });
         },
-        onScaleEnd:  (ScaleEndDetails scaleDetails) {
+        onScaleEnd: (ScaleEndDetails scaleDetails) {
           setState(() {
             _fontSize = _scale * _fontSize;
             _scale = 1;
@@ -93,23 +92,39 @@ class _MyHomePageState extends State<MyHomePage> {
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: <Widget>[
-              Expanded(
-                child: TextField(
-                  keyboardType: TextInputType.multiline,
-                  maxLines: null,
-                  key: _textFieldKey,
-                  controller: _controller,
-                  decoration: InputDecoration(
-                    hintText: 'Start typing. Try zooming...',
-                    hintStyle: TextStyle(fontSize: 25),
-                    border: InputBorder.none,
-                    fillColor: Colors.orange,
-                    filled: true,
-                    //contentPadding: textFieldPadding,
-                  ),
-                  style: textFieldTextStyle.copyWith(fontSize: getFontSize()),
-                ),
-              )
+              Expanded(child: LayoutBuilder(builder: (context, size) {
+                TextSpan text = new TextSpan(
+                  text: _controller.text,
+                  style: textFieldTextStyle,
+                );
+
+                TextPainter tp = new TextPainter(
+                  text: text,
+                  textDirection: TextDirection.ltr,
+                  textAlign: TextAlign.left,
+                );
+                tp.layout(maxWidth: size.maxWidth);
+
+                if (_fontSize == -1) {
+                  _fontSize = calculateAutoscaleFontSize(
+                      hintText, textFieldTextStyle, MinFontSize, size.maxWidth);
+                }
+
+                return TextField(
+                    controller: _controller,
+                    keyboardType: TextInputType.multiline,
+                    maxLines: null,
+                    key: _textFieldKey,
+                    style: textFieldTextStyle.copyWith(fontSize: getFontSize()),
+                    decoration: InputDecoration(
+                      hintText: hintText,
+                      hintStyle: TextStyle(fontSize: _fontSize),
+                      border: InputBorder.none,
+                      fillColor: Colors.orange,
+                      filled: true,
+                      //contentPadding: textFieldPadding,
+                    ));
+              }))
             ],
           ),
         ),
@@ -117,10 +132,32 @@ class _MyHomePageState extends State<MyHomePage> {
       floatingActionButton: FloatingActionButton(
         tooltip: 'Clear text',
         child: Icon(Icons.clear),
-        onPressed: (){
+        onPressed: () {
           _controller.clear();
         },
       ), // This trailing comma makes auto-formatting nicer for build methods.
     );
   }
+}
+
+double calculateAutoscaleFontSize(
+    String text, TextStyle style, double startFontSize, double maxWidth) {
+  final textPainter = TextPainter(textDirection: TextDirection.ltr);
+
+  var currentFontSize = startFontSize;
+
+  for (var i = 0; i < 100; i++) {
+    // limit max iterations to 100
+    final nextFontSize = currentFontSize + 1;
+    final nextTextStyle = style.copyWith(fontSize: nextFontSize);
+    textPainter.text = TextSpan(text: text, style: nextTextStyle);
+    textPainter.layout();
+    if (textPainter.width >= maxWidth) {
+      break;
+    } else {
+      currentFontSize = nextFontSize;
+      // continue iteration
+    }
+  }
+  return currentFontSize;
 }
